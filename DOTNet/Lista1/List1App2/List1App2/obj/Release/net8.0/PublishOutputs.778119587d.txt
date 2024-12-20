@@ -1,0 +1,7 @@
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\List1App2.exe
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\appsettings.Development.json
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\appsettings.json
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\List1App2.dll
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\List1App2.deps.json
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\List1App2.runtimeconfig.json
+C:\Repos\kody\DOTNet\Lista1\List1App2\List1App2\obj\Release\net8.0\PubTmp\Out\List1App2.pdb

@@ -1,0 +1,11 @@
+{
+  "name": "zadanie2",
+  "version": "1.0.0",
+  "description": "program, który wyznacza zbiór wszystkich liczb natualnych 1 a 100000, które",
+  "main": "division.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Marcin Czapulak",
+  "license": "ISC"
+}

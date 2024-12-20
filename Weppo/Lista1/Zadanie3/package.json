@@ -1,0 +1,11 @@
+{
+  "name": "zadanie3",
+  "version": "1.0.0",
+  "description": "Liczby pierwsze w js",
+  "main": "pierwsze.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Marcin Czapulak",
+  "license": "ISC"
+}

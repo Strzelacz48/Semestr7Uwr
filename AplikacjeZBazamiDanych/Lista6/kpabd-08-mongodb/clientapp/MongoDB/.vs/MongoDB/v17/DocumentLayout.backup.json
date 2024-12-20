@@ -1,0 +1,54 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Repos\\kody\\AplikacjeZBazamiDanych\\Lista6\\kpabd-08-mongodb\\clientapp\\MongoDB\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{4CD4A1EA-99DC-4C30-B2AD-88AD154AF539}|MongoDBClient\\MongoDBClient.csproj|c:\\repos\\kody\\aplikacjezbazamidanych\\lista6\\kpabd-08-mongodb\\clientapp\\mongodb\\mongodbclient\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4CD4A1EA-99DC-4C30-B2AD-88AD154AF539}|MongoDBClient\\MongoDBClient.csproj|solutionrelative:mongodbclient\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4CD4A1EA-99DC-4C30-B2AD-88AD154AF539}|MongoDBClient\\MongoDBClient.csproj|c:\\repos\\kody\\aplikacjezbazamidanych\\lista6\\kpabd-08-mongodb\\clientapp\\mongodb\\mongodbclient\\mongodbclient.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{4CD4A1EA-99DC-4C30-B2AD-88AD154AF539}|MongoDBClient\\MongoDBClient.csproj|solutionrelative:mongodbclient\\mongodbclient.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MongoDBClient",
+              "DocumentMoniker": "C:\\Repos\\kody\\AplikacjeZBazamiDanych\\Lista6\\kpabd-08-mongodb\\clientapp\\MongoDB\\MongoDBClient\\MongoDBClient.csproj",
+              "RelativeDocumentMoniker": "MongoDBClient\\MongoDBClient.csproj",
+              "ToolTip": "C:\\Repos\\kody\\AplikacjeZBazamiDanych\\Lista6\\kpabd-08-mongodb\\clientapp\\MongoDB\\MongoDBClient\\MongoDBClient.csproj",
+              "RelativeToolTip": "MongoDBClient\\MongoDBClient.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2024-11-22T23:09:03.953Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Repos\\kody\\AplikacjeZBazamiDanych\\Lista6\\kpabd-08-mongodb\\clientapp\\MongoDB\\MongoDBClient\\Program.cs",
+              "RelativeDocumentMoniker": "MongoDBClient\\Program.cs",
+              "ToolTip": "C:\\Repos\\kody\\AplikacjeZBazamiDanych\\Lista6\\kpabd-08-mongodb\\clientapp\\MongoDB\\MongoDBClient\\Program.cs*",
+              "RelativeToolTip": "MongoDBClient\\Program.cs*",
+              "ViewState": "AgIAABEAAAAAAAAAAAAAwB8AAABOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-11-22T22:42:44.477Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

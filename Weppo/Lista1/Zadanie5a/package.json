@@ -1,0 +1,11 @@
+{
+  "name": "fibrec",
+  "version": "1.0.0",
+  "description": "Fibonacci recursive",
+  "main": "fibrec.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Marcin Czapulak",
+  "license": "ISC"
+}

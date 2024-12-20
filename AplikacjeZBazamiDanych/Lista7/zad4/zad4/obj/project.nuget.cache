@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "8CCSTW7DHaM=",
+  "success": true,
+  "projectFilePath": "C:\\Repos\\kody\\AplikacjeZBazamiDanych\\Lista7\\zad4\\zad4\\zad4.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\zenob\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\5.0.0\\microsoft.bcl.asyncinterfaces.5.0.0.nupkg.sha512",
+    "C:\\Users\\zenob\\.nuget\\packages\\neo4j.driver\\5.27.0\\neo4j.driver.5.27.0.nupkg.sha512",
+    "C:\\Users\\zenob\\.nuget\\packages\\system.io.pipelines\\7.0.0\\system.io.pipelines.7.0.0.nupkg.sha512",
+    "C:\\Users\\zenob\\.nuget\\packages\\system.valuetuple\\4.5.0\\system.valuetuple.4.5.0.nupkg.sha512"
+  ],
+  "logs": []
+}
