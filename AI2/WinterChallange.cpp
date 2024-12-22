@@ -40,7 +40,7 @@ pair<int, pair<int, int>> find_nearest_protein(const unordered_map<int, Organ>& 
     int min_distance = INT32_MAX;
     int selected_organ_id = -1;
     pair<int, int> closest_protein = {-1, -1};
-
+    //TODO poprawić kod aby po znalezieniu nieskońcczonego źródła zasobów zajmował jak najwięcej pól
     for (const auto& [organ_id, organ] : organs) {
         queue<pair<int, int>> q;
         set<pair<int, int>> visited;
@@ -146,9 +146,16 @@ int main() {
         pair<int, int> closest_protein = nearest_protein.second;
 
         for (int i = 0; i < required_actions_count; i++) {
-            for (const auto& [dx, dy] : directions) {
-                int nx = my_organs[selected_organ_id]. + dx;
-                int ny = cy + dy;
+            bool harvester = false;
+
+            if(my_stock.c > 0 && my_stock.d > 0){
+                for (const auto& [dx, dy] : directions) {
+                    int nx = my_organs[selected_organ_id].i + dx;
+                    int ny = my_organs[selected_organ_id].j + dy;
+                    if (grid[nx][ny] == "A"){
+                        //TODO napisać logikę dla harvestera i upewnić się że nie zostanie nadpisany
+                    }
+                }
             }
             if (selected_organ_id != -1 && closest_protein.first != -1) {
                 cout << "GROW " << selected_organ_id << " " << closest_protein.first << " " << closest_protein.second <<" BASIC\n";
