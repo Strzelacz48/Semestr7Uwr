@@ -57,17 +57,10 @@
   "C_Cpp_Runner.useLinkTimeOptimization": false,
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
   "files.associations": {
-    "*.ndjson": "jsonl",
     "*.dbclient-js": "javascript",
-    "tuple": "cpp",
-    "*.tcc": "cpp",
-    "ostream": "cpp",
-    "unordered_map": "cpp",
     "iostream": "cpp",
-    "string": "cpp",
-    "xstring": "cpp",
-    "utility": "cpp",
-    "cstdlib": "cpp",
-    "span": "cpp"
+    "ostream": "cpp",
+    "functional": "cpp",
+    "cmath": "cpp"
   }
 }
