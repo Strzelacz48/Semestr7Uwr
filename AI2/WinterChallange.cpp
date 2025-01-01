@@ -30,7 +30,7 @@ void printGrid(const vector<vector<string>>& grid) {
 }
 
 // Structure to represent an organ on the grid
-struct Organ {
+struct Organ {//TODO dodać relację rodzica do dzieci albo przynajmniej liczbę dzieci
     int i, j;
     string type;
     int owner;
@@ -86,6 +86,16 @@ pair<int, int> getDirection(string directionName) {
 // Function to check if a position is within the grid and valid
 bool is_valid(int x, int y, int width, int height, const vector<vector<string>>& grid) {
     return x >= 0 && x < width && y >= 0 && y < height && (grid[y][x] == "EMPTY" || grid[y][x] == "A");
+}
+
+int how_many(Organ target){
+    return 
+}
+
+//Checks every enemy organ that we have access to and picks one that is father to most enemies
+Organ best_enemy_target(){
+    Organ result;
+    return result;
 }
 
 // Function to check if a given position is next to a protein source
@@ -236,11 +246,18 @@ int main() {
         int selected_organ_id = nearest_protein.second.second.second.first;
         pair<int, int> closest_protein = nearest_protein.second.second.second.second;
 
-        bool harvester_built = false;
+        bool unique_organ_built = false;
 
         for (int i = 0; i < required_actions_count; i++) {
-            cerr << "should i build harvester: " << my_stock.c << " " << my_stock.d << " " << selected_organ_id << " " << closest_protein.first << " " << closest_protein.second << " " << harvester_built << endl;
-            if (my_stock.c > 0 && my_stock.d > 0 && selected_organ_id != -1 && closest_protein.first != -1 && !harvester_built) {
+            //Building tentacle logic part
+            if(my_stock.b > 0 && my_stock.c > 0 && !unique_organ_built){
+                
+                cout << "GROW " << selected_organ_id << " " << nx << " " << ny << " TENTACLE " << best_enemy_target();//harvesterOrientation(closest_protein,{nx, ny}) << endl;
+            }
+
+            //Building harvester logic part
+            cerr << "should i build harvester: " << my_stock.c << " " << my_stock.d << " " << selected_organ_id << " " << closest_protein.first << " " << closest_protein.second << " " << unique_organ_built << endl;
+            if (my_stock.c > 0 && my_stock.d > 0 && selected_organ_id != -1 && closest_protein.first != -1 && !unique_organ_built) {
                 //for (size_t dir_index = 0; dir_index < directions.size(); ++dir_index) {
                     //int dx = directions[dir_index].first;
                     //int dy = directions[dir_index].second;
@@ -255,14 +272,14 @@ int main() {
                             cout << "GROW " << selected_organ_id << " " << nx << " " << ny << " HARVESTER " << harvesterOrientation(closest_protein,{nx, ny}) << endl;
                             grid[ny][nx] = "HARVESTER"; // Mark the position as occupied
                             grid[closest_protein.second][closest_protein.first] = "PROTEIN_USED"; // Mark the protein source as exclusively used
-                            harvester_built = true;
+                            unique_organ_built = true;
                             break;
                         }
                     }
                 //}
             }
 
-            if (!harvester_built) {
+            if (!unique_organ_built) {
                 if (selected_organ_id != -1 && closest_protein.first != -1 && closest_protein.second != -1 
                 && used_protein_sources.find({closest_protein}) == used_protein_sources.end()) {// Prioretise claming proteins
                     cout << "GROW " << selected_organ_id << " " << bst_first_mov.first << " " << bst_first_mov.second << " BASIC" << endl;
@@ -276,7 +293,7 @@ int main() {
                             break;
                         }
                     }
-                }//TODO kiedy wszystkie inne pola są zajęte zbierz tyle protein ile potrzeba by zaklepać moje użyte miejsca (i pamiętaj że co turę będzie wciąż zbierać)
+                }//TODO kiedy wszystkie inne pola są zajęte zbierz tyle protein ile potrzeba by zaklepać wolne miejsca (i pamiętaj że co turę będzie wciąż zbierać), a potem zbuduj na proteinie cokolwiek
                 else{// if everything else fails wait
                     cout << "WAIT" << endl;
                 }
