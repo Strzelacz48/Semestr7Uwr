@@ -3,18 +3,31 @@
 #include <vector>
 #include <algorithm>
 #include <queue>
+#include <random>
+#include <time.h>
 
 #pragma GCC optimize("Ofast,inline,tracer")
 #pragma GCC optimize("unroll-loops,vpt,split-loops,unswitch-loops")
 
 using namespace std;
 
+#define TURN_LIMIT 200
+#define TIME_LIMIT 100 //ms
+#define MAX_DEPTH 25
 
 enum Field {
     HOLE = -2,
     EMPTY = -1,
     PLAYER_ZERO = 0,
-    PLAYER_ONE = 1
+    PLAYER_ONE = 1,
+    OCCUPIED = 2
+};
+
+enum Direction {
+    UP = 0,
+    DOWN = 1,
+    LEFT = 2,
+    RIGHT = 3
 };
 
 typedef vector<vector<int>> Map;
@@ -31,37 +44,37 @@ const vector<Position> directions = {
     {1, 0}    // right
 };
 
-bool isValid(const Map &map, int x, int y) {
-    return x >= 0 && x < map[0].size() && y >= 0 && y < map.size();
-}
-
-void printMap(const Map &map) {
+void printMap(const Map& map) {
     for (const auto &row : map) {
         for (int cell : row) {
             if (cell == HOLE) {
-                cerr << "H ";
+                std::cerr << "\033[40m\033[30mH \033[0m"; // Black background, black text
             } else if (cell == EMPTY) {
-                cerr << ". ";
+                std::cerr << "\033[40m\033[37m. \033[0m"; // Black background, white text
             } else if (cell == PLAYER_ZERO) {
-                cerr << "0 ";
+                std::cerr << "\033[44m\033[37m0 \033[0m"; // Blue background, white text
             } else if (cell == PLAYER_ONE) {
-                cerr << "1 ";
+                std::cerr << "\033[41m\033[37m1 \033[0m"; // Red background, white text
             }
         }
-        cerr << endl;
+        std::cerr << std::endl;
     }
-    cerr << endl;
+    std::cerr << std::endl;
 }
-
+//Basic Game Logic
+//=======================================================================================================
 //funkcja która powinna decydować czy dane pole się rusza czy nie
 int willIMove(int myID, int neighbor, bool activeID){
-    if(myID == EMPTY || myID == HOLE){
+    if(activeID != myID && myID == EMPTY && neighbor != EMPTY){
+        return 0;
+    }
+    else if(myID == EMPTY || myID == HOLE){
         return 1;//nie rusz sie
     }
-    if(activeID == myID){
+    else if(activeID == myID){
         return 3;//aktywny gracz się rusza(zamień się na puste pole)
     }
-    if(myID == neighbor){
+    else if(myID == neighbor){
         return 0;//kontynuuj rekurencje
     }
     else if(neighbor == EMPTY || neighbor == HOLE){
@@ -73,98 +86,41 @@ int willIMove(int myID, int neighbor, bool activeID){
 }
 
 //dir == 0 przesuwa od lewej do prawej, dir == 1 od prawej do lewej (przesuwanie z dir == 1 nie działa)
-int* moveRow(int size, int* row, int dir, bool activeID){
+int* moveRow(int size, int* row, bool activeID){
     int* newRow = new int[size];
     int move;
-    if(dir == 0){
-        for(int i = 0; i < size; i++){
-            if(i == size - 1){
-                if(row[i] == activeID){
-                    newRow[i] = EMPTY;
-                }
-                else{
-                    newRow[i] = row[i];
-                }
-                break;
-            }
-            else{
-                move = willIMove(row[i], row[i + 1], activeID);
-                int ii = i;
-                while(move == 0){
-                    ii++;
-                    if(ii >= size - 2){
-                        // cerr<<" i = "<<i<<endl;
-                        // cerr<<"row[i] = "<<row[i]<<endl;
-                        // cerr<<"row[i + 1] = "<<row[i + 1]<<endl;
-                        // cerr<<"activeID = "<<activeID<<endl;
-                        // move = 4;
-                        // if(row[i] == activeID){
-                        //     newRow[i] = activeID;
-                        //     newRow[i + 1] = EMPTY;
-                        // }
-                        // else{
-                        //     newRow[i] = row[i];
-                        //     newRow[i + 1] = row[i + 1];
-                        //     cerr<<"newRow[i] = "<<newRow[i]<<endl;
-                        //     cerr<<"newRow[i + 1] = "<<newRow[i + 1]<<endl;
-
-                        // }
-                        break;
-                    }
-                    move = willIMove(row[ii], row[ii + 1], activeID);
-                    
-                }
-                if(move == 1){
-                    newRow[i] = row[i];
-                    continue;
-                }
-                else if(move == 2){
-                    if(i > 0 && row[i - 1] != HOLE){
-                        newRow[i - 1] = row[i];
-                    }
-                    newRow[i] = row[i + 1];   
-                }
-                else if(move == 3){
-                    if(i > 0 && row[i - 1] != HOLE){
-                        newRow[i - 1] = row[i];
-                    }
-                    newRow[i] = EMPTY;
-                }
-            }
+    for(int i = 0; i < size; i++){
+        if(i == size - 1){
+            move = activeID == row[i] ? 3 : 1;
         }
-        
-    }
-    else if(dir == 1){
-        for(int i = size; i > 0; i--){
-            int move = willIMove(row[i], row[i - 1], activeID);
+        else{
+            move = willIMove(row[i], row[i + 1], activeID);
             int ii = i;
             while(move == 0){
-                ii--;
-                if(ii <= 1){
+                ii++;
+                if(ii >= size - 1){
                     move = 1;
                     break;
                 }
-                move = willIMove(row[ii], row[ii - 1], activeID);
-            }
-            if(move == 1){
-                newRow[i] = row[i];
-                continue;
-            }
-            else if(move == 2){
-                if(i < size - 1 && row[i + 1] != HOLE){
-                    newRow[i + 1] = row[i];
-                }
-                newRow[i] = row[i - 1];
-            }
-            else if(move == 3){
-                if(i < size - 1 && row[i + 1] != HOLE){
-                    newRow[i + 1] = row[i];
-                }
-                newRow[i] = EMPTY;
+                move = willIMove(row[ii], row[ii + 1], activeID);
             }
         }
+        if(move == 1){
+            newRow[i] = row[i];
+        }
+        else if(move == 2){
+            if(i > 0 && row[i - 1] != HOLE){
+                newRow[i - 1] = row[i];
+            }
+            newRow[i] = row[i + 1];
+        }
+        else if(move == 3){
+            if(i > 0 && row[i - 1] != HOLE && row[i] != EMPTY){
+                newRow[i - 1] = row[i];
+            }
+            newRow[i] = EMPTY;
+        }
     }
-
     return newRow;
 }
 
@@ -172,63 +128,87 @@ int* moveRow(int size, int* row, int dir, bool activeID){
 Map trimMap(const Map &map) {
     Map newMap = map;
     for(int i = 0; i < map.size() - 1; i++){// cięcie od góry
-        bool empty = true;
+        int row_state = HOLE;
         for(int j = 0; j < map[i].size(); j++){
             if(map[i][j] != EMPTY && map[i][j] != HOLE){
-                empty = false;
+                row_state = OCCUPIED;
                 break;
             }
+            else if(map[i][j] == EMPTY){
+                row_state = EMPTY;
+            }
         }
-        if(empty){
+        if(row_state == OCCUPIED){
+            break;
+        }
+        else if(row_state == EMPTY){
             for(int j = 0; j < map[i].size(); j++){
                 newMap[i][j] = HOLE;
             }
-            break;
+            //break;
         }
     }
     for(int i = map.size() - 1; i >= 0; i--){// cięcie od dołu
-        bool empty = true;
+        int row_state = HOLE;
         for(int j = 0; j < map[i].size(); j++){
             if(map[i][j] != EMPTY && map[i][j] != HOLE){
-                empty = false;
+                row_state = OCCUPIED;
                 break;
             }
+            else if(map[i][j] == EMPTY){
+                row_state = EMPTY;
+            }
         }
-        if(empty){
+        if(row_state == OCCUPIED){
+            break;
+        }
+        else if(row_state == EMPTY){
             for(int j = 0; j < map[i].size(); j++){
                 newMap[i][j] = HOLE;
             }
-            break;
+            //break;
         }
     }
     for(int i = 0; i < map[0].size() - 1; i++){// cięcie od lewej
-        bool empty = true;
+        int col_state = HOLE;
         for(int j = 0; j < map.size(); j++){
             if(map[j][i] != EMPTY && map[j][i] != HOLE){
-                empty = false;
+                col_state = OCCUPIED;
                 break;
             }
+            else if(map[j][i] == EMPTY){
+                col_state = EMPTY;
+            }
         }
-        if(empty){
+        if(col_state == OCCUPIED){
+            break;
+        }
+        else if(col_state == EMPTY){
             for(int j = 0; j < map.size(); j++){
                 newMap[j][i] = HOLE;
             }
-            break;
+            //break;
         }
     }
     for(int i = map[0].size() - 1; i >= 0; i--){// cięcie od prawej
-        bool empty = true;
+        int col_state = HOLE;
         for(int j = 0; j < map.size(); j++){
             if(map[j][i] != EMPTY && map[j][i] != HOLE){
-                empty = false;
+                col_state = OCCUPIED;
                 break;
             }
+            else if(map[j][i] == EMPTY){
+                col_state = EMPTY;
+            }
         }
-        if(empty){
+        if(col_state == OCCUPIED){
+            break;
+        }
+        else if(col_state == EMPTY){
             for(int j = 0; j < map.size(); j++){
                 newMap[j][i] = HOLE;
             }
-            break;
+            //break;
         }
     }
     return newMap;
@@ -258,73 +238,175 @@ void AprintRow(int* newRow, int i, int size){
 Map move(Map &map, int dirIndex, bool active){
     const auto &dir = directions[dirIndex];
     Map newMap = map;
-    if(dirIndex == 0){//w górę
+    if(dirIndex == UP){//w górę
         for(int i = 0; i < map[0].size(); i++){
             int* newRow = new int[map[0].size()];
             for(int j = 0; j < map.size(); j++){
                 newRow[j] = map[j][i];
             }
-            BprintRow(newRow, i,map.size());
-            newRow = moveRow(map.size(), newRow, 0, active);
-            AprintRow(newRow, i,map.size());
+            //BprintRow(newRow, i,map.size());
+            newRow = moveRow(map.size(), newRow, active);
+            //AprintRow(newRow, i,map.size());
             for(int j = 0; j < map.size(); j++){
                 newMap[j][i] = newRow[j];
             }
         }
     }
-    else if(dirIndex == 1){//w dół
+    else if(dirIndex == DOWN){//w dół
         for(int i = 0; i < map[0].size(); i++){
             int* newRow = new int[map[0].size()];
-            for(int j = 0; j < map.size(); j++){
-                newRow[map.size() - 1 - j] = map[j][i];//newRow[j] = map[j][i];
+            for(int j = map.size() - 1; j >= 0; j--){
+                newRow[map.size() - 1 - j] = map[j][i];
             }
-            BprintRow(newRow, i,map.size());
-            newRow = moveRow(map.size(), newRow, 0, active);
-            AprintRow(newRow, i,map.size());
+            //BprintRow(newRow, i,map.size());
+            newRow = moveRow(map.size(), newRow, active);
+            //AprintRow(newRow, i,map.size());
             for(int j = 0; j < map.size(); j++){
-                newMap[j][i] = newRow[map.size() - 1 - j];
+                newMap[map.size() - 1 - j][i] = newRow[j];  
             }
         }
     }
-    else if(dirIndex == 2){//w lewo
+    else if(dirIndex == LEFT){//w lewo
         for(int i = 0; i < map.size(); i++){
-            int* newRow = new int[map.size()];
+            int* newRow = new int[map[0].size()];
             for(int j = 0; j < map[0].size(); j++){
                 newRow[j] = map[i][j];
             }
-            BprintRow(newRow, i,map.size());
-            newRow = moveRow(map[0].size(), newRow, 0, active);
-            AprintRow(newRow, i,map.size());
+            //BprintRow(newRow, i,map.size());
+            newRow = moveRow(map[0].size(), newRow, active);
+            //AprintRow(newRow, i,map.size());
             for(int j = 0; j < map[0].size(); j++){
                 newMap[i][j] = newRow[j];
             }
         }
     }
-    else if(dirIndex == 3){// w prawo
+    else if(dirIndex == RIGHT){// w prawo
         for(int i = 0; i < map.size(); i++){
-            int* newRow = new int[map.size()];
-            for(int j = 0; j < map[0].size(); j++){
-                newRow[j] = map[i][j];
+            int* newRow = new int[map[0].size()];
+            for(int j = map[0].size() - 1; j >= 0; j--){
+                newRow[map[0].size() - 1 - j] = map[i][j];
             }
-            BprintRow(newRow, i,map.size());
-            newRow = moveRow(map[0].size(), newRow, 1, active);
-            AprintRow(newRow, i,map.size());
+            //BprintRow(newRow, i,map[0].size());
+            newRow = moveRow(map[0].size(), newRow, active);
+            //AprintRow(newRow, i,map[0].size());
             for(int j = 0; j < map[0].size(); j++){
-                newMap[i][j] = newRow[j];
+                newMap[i][map[0].size() - 1 - j] = newRow[j];
             }
         }
     }
-    cerr << "After Player moves:" << endl;
-    printMap(newMap);
+    //cerr << "After Player moves:" << endl;
+    //printMap(newMap);
     //Trim empty sides
     newMap = trimMap(newMap);
 
     return newMap;
 }
 
+pair<int, int> getScore(const Map &map, int myID, int opponentID){
+    int myScore = 0;
+    int opponentScore = 0;
+    for(int i = 0; i < map.size(); i++){
+        for(int j = 0; j < map[0].size(); j++){
+            if(map[i][j] == myID){
+                myScore++;
+            }
+            else if(map[i][j] == opponentID){
+                opponentScore++;
+            }
+        }
+    }
+    return {myScore, opponentScore};
+}
+
+bool is_game_over(const Map &map) {
+    bool plONE = false;
+    bool plZERO = false;
+    for (const auto &row : map) {
+        for (int cell : row) {
+            if (cell == PLAYER_ONE) {
+                plONE = true;
+            } else if (cell == PLAYER_ZERO) {
+                plZERO = true;
+            }
+            if(plONE && plZERO){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+//=======================================================================================================
+//MCTS
+//=======================================================================================================
+
+// Helper to calculate random direction
+Direction getRandomDirection() {
+    static random_device rd;
+    static mt19937 gen(rd());
+    static uniform_int_distribution<> dis(0, 3);
+    return static_cast<Direction>(dis(gen));
+}
+
+// Perform a single simulation from the given map state
+pair<int, int> simulateGame(Map map, int myID, int opponentID, int maxDepth) {
+    bool active = myID == 1 ? true : false;
+    for (int depth = 0; depth < maxDepth; ++depth) {
+        Direction randomMove = getRandomDirection();
+        map = move(map, randomMove, active);
+        if (is_game_over(map)) {
+            break;
+        }
+        active = !active;
+        randomMove = getRandomDirection();
+        map = move(map, randomMove, active);
+        if (is_game_over(map)) {
+            break;
+        }
+        active = !active;
+    }
+    return getScore(map, myID, opponentID);
+}
+
+Direction MCTS(const Map &map, int myID, int opponentID, int depth, int maxDepth, int maxTime){
+    clock_t startTime = clock();
+    vector<int> scores(4, 0); // Scores for each direction
+    vector<int> visits(4, 0); // Number of simulations for each direction
+    Map tempMap = map;
+    int nrOfSimulations = 0;
+    while ((clock() - startTime) * 1000 / CLOCKS_PER_SEC < maxTime) {
+        Direction new_move = getRandomDirection();
+        Map simulatedMap = move(tempMap, new_move, true);
+
+        pair<int, int> score = simulateGame(simulatedMap, myID, opponentID, maxDepth);
+        int myScore = score.first;
+        int opponentScore = score.second;
+
+        int scoreDiff = myScore - opponentScore;
+        scores[new_move] += scoreDiff;
+        visits[new_move]++;
+        nrOfSimulations++;
+    }
+
+    // Select the direction with the best average score
+    double bestAvg = -1e9;
+    Direction bestMove = UP;
+    for (int i = 0; i < 4; ++i) {
+        if (visits[i] > 0) {
+            double avgScore = static_cast<double>(scores[i]) / visits[i];
+            if (avgScore > bestAvg) {
+                bestAvg = avgScore;
+                bestMove = static_cast<Direction>(i);
+            }
+        }
+    }
+    cerr << "Number of simulations: " << nrOfSimulations << endl;
+    return bestMove;
+}
+
 int main() {
     //Zakomentowany kod do interakcji z API gry
-    /*int my_id; // Your id, 0 or 1
+    int my_id; // Your id, 0 or 1
     cin >> my_id; cin.ignore();
     int height; // height of the grid
     cin >> height; cin.ignore();
@@ -358,7 +440,32 @@ int main() {
                 }
             }
         }
-        printMap(gameMap);*/
+        //printMap(gameMap);
+
+        Direction move = MCTS(gameMap, my_id, my_id == 0 ? 1 : 0, 0, MAX_DEPTH, TIME_LIMIT);
+        switch (move)
+        {
+        case UP:
+            cout << "UP" << endl;
+            break;
+        
+        case DOWN:
+            cout << "DOWN" << endl;
+            break;
+
+        case LEFT:
+            cout << "LEFT" << endl;
+            break;
+
+        case RIGHT:
+            cout << "RIGHT" << endl;
+            break;
+
+        default:
+            cout << "UP" << endl;
+            break;
+        }
+        /* DEBUG
         // Example map
         Map map = {
             {1, 1, 1, 1, 0, 1, 1, 0},
@@ -367,39 +474,76 @@ int main() {
             {1, 0, 1, 0, 0, 1, 0, 1},
             {1, 0, 1, 1, 1, 0, 0, 1},
             {0, 0, 1, 1, 1, 1, 0, 1},
-            {0, 0, 0, 0, 0, 1, 0, 0}//,
-            //{1, 1, 1, 1, 1, 1, 1, 1}
+            {0, 0, 0, 0, 0, 1, 0, 0},
+            {1, 1, 1, 1, 1, 1, 1, 1}
         };
         Map tempMap = map;
         cerr << "Initial map:" << endl;
         printMap(map);
 
         // Player 0 moves up
-        map = move(map, 0, PLAYER_ZERO);
-        cerr << "Before Player 0 moves up:" << endl;
-        printMap(tempMap);
-        cerr << "After Player 0 moves up:" << endl;
-        printMap(map);
-        
-        // Player 1 moves right
-        tempMap = map;
-        map = move(map, 1, PLAYER_ONE);
-        cerr << "Before Player 1 moves down:" << endl;
-        printMap(tempMap);
-        cerr << "After Player 1 moves down:" << endl;
-        printMap(map);
-        
-        // // Player 0 moves up
-        // map = move(map, 2, PLAYER_ONE);
-        // cerr << "After Player 0 moves left:" << endl;
+        //map = move(map, UP, PLAYER_ZERO);
+        // //cerr << "Before Player 0 moves up:" << endl;
+        // //printMap(tempMap);
+        // cerr << "After Player 0 moves up:" << endl;
         // printMap(map);
-
+        
+        // // Player 1 moves down
+        // tempMap = map;
+        // map = move(map, DOWN, PLAYER_ONE);
+        // //printMap(tempMap);
+        // cerr << "After Player 1 moves down:" << endl;
+        // //printMap(map);
+        
+        //cerr << "After Player 0 moves left:" << endl;
+        
+        // // Player 0 moves right
+        // map = move(map, RIGHT, PLAYER_ZERO);
+        // cerr << "After Player 0 moves right:" << endl;
+        // printMap(map);
+        
         // // Player 1 moves right
-        // map = move(map, 3, PLAYER_ZERO);
+        // map = move(map, RIGHT, PLAYER_ONE);
         // cerr << "After Player 1 moves right:" << endl;
         // printMap(map);
 
-    //}
+        //make 6 random moves
+        for(int i = 0; i < 40; i++){
+            bool isEmpty = true;
+            //check is map empty
+            for(int j = 0; j < map.size(); j++){
+                for(int k = 0; k < map[0].size(); k++){
+                    if(map[j][k] != HOLE){
+                        isEmpty = false;
+                        break;
+                    }
+                }
+                if(!isEmpty){
+                    break;
+                }
+            }
+            if(isEmpty){
+                cerr<<"Map is empty"<<endl;
+                break;
+            }
+            int random = rand() % 4;
+            map = move(map, random, i % 2);
+            cerr << "After player "<<i % 2<<" moves ";
+            if(Direction(random) == UP){
+                cerr<<"UP"<<endl;
+            }
+            else if(Direction(random) == DOWN){
+                cerr<<"DOWN"<<endl;
+            }
+            else if(Direction(random) == LEFT){
+                cerr<<"LEFT"<<endl;
+            }
+            else if(Direction(random) == RIGHT){
+                cerr<<"RIGHT"<<endl;
+            }
+            printMap(map);
+        }*/
+    }
 }
 
 

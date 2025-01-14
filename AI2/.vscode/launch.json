@@ -1,6 +1,8 @@
 {
   "version": "0.2.0",
   "configurations": [
+    
+
     {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
@@ -9,7 +11,7 @@
       "stopAtEntry": false,
       "externalConsole": true,
       "cwd": "c:/Repos/kody/AI2",
-      "program": "c:/Repos/kody/AI2/build/Debug/outDebug",
+      "program": "${fileDirname}/Bandas.exe",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
