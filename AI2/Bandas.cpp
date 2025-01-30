@@ -1,3 +1,5 @@
+#pragma GCC optimize("Ofast,inline,tracer")
+#pragma GCC optimize("unroll-loops,vpt,split-loops,unswitch-loops")
 #include <iostream>
 #include <string>
 #include <vector>
@@ -5,17 +7,33 @@
 #include <queue>
 #include <random>
 #include <time.h>
-
-#pragma GCC optimize("Ofast,inline,tracer")
-#pragma GCC optimize("unroll-loops,vpt,split-loops,unswitch-loops")
+#include <chrono>
+#include <ctime>
+#include <array>
+#include <cassert>
 
 using namespace std;
+using State = array<int,64>;
+using StateRow = array<int,8>;
 
 #define TURN_LIMIT 200
-#define TIME_LIMIT 100 //ms
-#define MAX_DEPTH 25
+#define TIME_LIMIT 100 - 10//ms
+#define MAX_DEPTH 5
+#define MAX_NODES 1024*64
+#define Score pair<int, int>
 
-enum Field {
+bool DEBUG = false;
+
+int height; // height of the grid
+int width;  // width of the grid
+
+// Forward declaration
+struct Node;
+extern array<Node, MAX_NODES> Tree;
+unsigned int allocatedNodes = 0;
+
+enum Field
+{
     HOLE = -2,
     EMPTY = -1,
     PLAYER_ZERO = 0,
@@ -23,14 +41,155 @@ enum Field {
     OCCUPIED = 2
 };
 
-enum Direction {
+enum Direction
+{
     UP = 0,
     DOWN = 1,
     LEFT = 2,
     RIGHT = 3
 };
 
-typedef vector<vector<int>> Map;
+// Węzeł drzewa MCTS
+struct Node
+{
+    unsigned int visits;           // Liczba odwiedzin węzła
+    double score;                  // Wynik węzła
+    unsigned int children[4];      // Indeksy dzieci węzła w Tree
+    int parentIdx;                 // Indeks rodzica węzła (-1 zanczy że jest rootem albo pusty)
+    Direction move;                // Ruch, który prowadzi do tego węzła
+    bool player_nr;                // Czy ruch który reprezentuje jest gracza 0 czy gracza 1
+    bool pruned;                   // Węzeł został obcięty i nie będzie rozwijany
+    bool winner;                   // Czy węzeł jest końcowy
+    int myIdx;                     // Mój indeks w tablicy Tree (-1 zanczy że jest pusty)
+
+    Node(int parentIdx = -1, Direction move = UP, bool player_nr = 0, int myIdx = -1)
+        : visits(0), score(0), parentIdx(parentIdx), move(move), player_nr(player_nr), pruned(false), 
+        myIdx(myIdx), winner(false)
+    {
+        if(myIdx != -1){ // kiedy tworzymy Node nie pusty
+            assert(allocatedNodes < MAX_NODES);
+            //allocatedNodes++;
+        }
+        fill(begin(children), end(children), 0); // Inicjalizacja dzieci na 0
+    }
+
+    ~Node()
+    {
+        //allocatedNodes--;
+    }
+
+    bool isFullyExpanded()
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            if (children[i] == 0)
+            {
+                return false;
+            }
+        }
+        return true; // 4 możliwe kierunki (UP, DOWN, LEFT, RIGHT)
+    }
+
+    int bestChildIdx(double explorationWeight)
+    {
+        double bestUCT = -numeric_limits<double>::infinity();
+        short idx = -1;
+        for (int i = 0; i < 4; ++i)
+        {
+            // if (Tree[children[i]].pruned)
+            // {
+            //     continue;
+            // }
+            double UCT = Tree[children[i]].score / (Tree[children[i]].visits + 1) +
+                         explorationWeight * sqrt(log(visits + 1) / (Tree[children[i]].visits + 1));
+            if (UCT > bestUCT)
+            {
+                bestUCT = UCT;
+                idx = i;
+            }
+        }
+        return idx;
+    }
+
+    // void isGameDetermined()
+    // {
+    //     if (!isFullyExpanded())
+    //         return;
+    //     bool gameFinished = true;
+    //     for (int i = 0; i < 4; ++i)
+    //     {
+    //         if (children[i] != 0 && !Tree[children[i]].pruned)
+    //         {
+    //             gameFinished = false;
+    //             break;
+    //         }
+    //     }
+    //     if (gameFinished)
+    //     {
+    //         pruned = true;
+    //     }
+    // }
+
+    void printNode()
+    {
+        string direction;
+        switch (move)
+        {
+        case UP:
+            direction = "UP";
+            break;
+        case DOWN:
+            direction = "DOWN";
+            break;
+        case LEFT:
+            direction = "LEFT";
+            break;
+        case RIGHT:
+            direction = "RIGHT";
+            break;
+        }
+
+        cerr << "Node details:\n";
+        cerr << "Visits: " << visits << "\n";
+        cerr << "Score: " << score << "\n";
+        cerr << "Children: [" << children[0] << ", "
+             << children[1] << ", " << children[2] << ", "
+             << children[3] << "]\n";
+        cerr << "Parent Index: " << parentIdx << "\n";
+        cerr << "Move: " << direction << "\n";
+        cerr << "Player Number: " << (player_nr ? "Player 1" : "Player 0") << "\n";
+        cerr << "Pruned: " << (pruned ? "true" : "false") << "\n";
+        cerr << "My Index: " << myIdx << "\n";
+    }
+
+    bool isRoot()
+    {
+        return myIdx == 0;
+    }
+
+    bool isEmpty(){
+        return myIdx == -1;
+    }
+};
+
+// Globalna tablica drzewo, wypełniona domyślnymi węzłami
+array<Node, MAX_NODES> Tree;
+
+void initializeTree()
+{
+    for (size_t i = 0; i < MAX_NODES; i++)
+    {
+        Tree[i] = Node();
+    }
+    allocatedNodes = 0;
+}
+
+int lastmove = -1;
+State lastmap;
+
+// Definicja globalnej tablicy
+//Node* tree[MAX_NODES] = {nullptr};
+// ~100MB
 
 struct Position {
     int x, y;
@@ -43,24 +202,15 @@ const vector<Position> directions = {
     {-1, 0},  // left
     {1, 0}    // right
 };
+//==========================================================================================================================
+//                                                    GAME LOGIC
+//==========================================================================================================================
 
-void printMap(const Map& map) {
-    for (const auto &row : map) {
-        for (int cell : row) {
-            if (cell == HOLE) {
-                std::cerr << "\033[40m\033[30mH \033[0m"; // Black background, black text
-            } else if (cell == EMPTY) {
-                std::cerr << "\033[40m\033[37m. \033[0m"; // Black background, white text
-            } else if (cell == PLAYER_ZERO) {
-                std::cerr << "\033[44m\033[37m0 \033[0m"; // Blue background, white text
-            } else if (cell == PLAYER_ONE) {
-                std::cerr << "\033[41m\033[37m1 \033[0m"; // Red background, white text
-            }
-        }
-        std::cerr << std::endl;
-    }
-    std::cerr << std::endl;
+int wrapPosition(int row, int column){
+    return row * width + column;
 }
+
+
 //Basic Game Logic
 //=======================================================================================================
 //funkcja która powinna decydować czy dane pole się rusza czy nie
@@ -86,8 +236,8 @@ int willIMove(int myID, int neighbor, bool activeID){
 }
 
 //dir == 0 przesuwa od lewej do prawej, dir == 1 od prawej do lewej (przesuwanie z dir == 1 nie działa)
-int* moveRow(int size, int* row, bool activeID){
-    int* newRow = new int[size];
+StateRow moveRow(int size, StateRow row, bool activeID){
+    StateRow newRow;
     int move;
     for(int i = 0; i < size; i++){
         if(i == size - 1){
@@ -124,17 +274,19 @@ int* moveRow(int size, int* row, bool activeID){
     return newRow;
 }
 
+
 //Funkcja przycina mapę puste krawędzie z każdej strony (raz na koniec tury) (odcięte pola są zastępowane przez HOLE)
-Map trimMap(const Map &map) {
-    Map newMap = map;
-    for(int i = 0; i < map.size() - 1; i++){// cięcie od góry
+State trimMap(const State map) {
+    State newMap = map;
+
+    for(int i = 0; i < height - 1; i++){// cięcie od góry
         int row_state = HOLE;
-        for(int j = 0; j < map[i].size(); j++){
-            if(map[i][j] != EMPTY && map[i][j] != HOLE){
+        for(int j = 0; j < width; j++){
+            if(map[wrapPosition(i, j)] != EMPTY && map[wrapPosition(i, j)] != HOLE){
                 row_state = OCCUPIED;
                 break;
             }
-            else if(map[i][j] == EMPTY){
+            else if(map[wrapPosition(i, j)] == EMPTY){
                 row_state = EMPTY;
             }
         }
@@ -142,20 +294,20 @@ Map trimMap(const Map &map) {
             break;
         }
         else if(row_state == EMPTY){
-            for(int j = 0; j < map[i].size(); j++){
-                newMap[i][j] = HOLE;
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, j)] = HOLE;
             }
             //break;
         }
     }
-    for(int i = map.size() - 1; i >= 0; i--){// cięcie od dołu
+    for(int i = height - 1; i >= 0; i--){// cięcie od dołu
         int row_state = HOLE;
-        for(int j = 0; j < map[i].size(); j++){
-            if(map[i][j] != EMPTY && map[i][j] != HOLE){
+        for(int j = 0; j < width; j++){
+            if(map[wrapPosition(i, j)] != EMPTY && map[wrapPosition(i, j)] != HOLE){
                 row_state = OCCUPIED;
                 break;
             }
-            else if(map[i][j] == EMPTY){
+            else if(map[wrapPosition(i, j)] == EMPTY){
                 row_state = EMPTY;
             }
         }
@@ -163,20 +315,20 @@ Map trimMap(const Map &map) {
             break;
         }
         else if(row_state == EMPTY){
-            for(int j = 0; j < map[i].size(); j++){
-                newMap[i][j] = HOLE;
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, j)] = HOLE;
             }
             //break;
         }
     }
-    for(int i = 0; i < map[0].size() - 1; i++){// cięcie od lewej
+    for(int i = 0; i < width - 1; i++){// cięcie od lewej
         int col_state = HOLE;
-        for(int j = 0; j < map.size(); j++){
-            if(map[j][i] != EMPTY && map[j][i] != HOLE){
+        for(int j = 0; j < height; j++){
+            if(map[wrapPosition(j, i)] != EMPTY && map[wrapPosition(j, i)] != HOLE){
                 col_state = OCCUPIED;
                 break;
             }
-            else if(map[j][i] == EMPTY){
+            else if(map[wrapPosition(j, i)] == EMPTY){
                 col_state = EMPTY;
             }
         }
@@ -184,20 +336,20 @@ Map trimMap(const Map &map) {
             break;
         }
         else if(col_state == EMPTY){
-            for(int j = 0; j < map.size(); j++){
-                newMap[j][i] = HOLE;
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(j, i)] = HOLE;
             }
             //break;
         }
     }
-    for(int i = map[0].size() - 1; i >= 0; i--){// cięcie od prawej
+    for(int i = width - 1; i >= 0; i--){// cięcie od prawej
         int col_state = HOLE;
-        for(int j = 0; j < map.size(); j++){
-            if(map[j][i] != EMPTY && map[j][i] != HOLE){
+        for(int j = 0; j < height; j++){
+            if(map[wrapPosition(j, i)] != EMPTY && map[wrapPosition(j, i)] != HOLE){
                 col_state = OCCUPIED;
                 break;
             }
-            else if(map[j][i] == EMPTY){
+            else if(map[wrapPosition(j, i)] == EMPTY){
                 col_state = EMPTY;
             }
         }
@@ -205,8 +357,8 @@ Map trimMap(const Map &map) {
             break;
         }
         else if(col_state == EMPTY){
-            for(int j = 0; j < map.size(); j++){
-                newMap[j][i] = HOLE;
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(j, i)] = HOLE;
             }
             //break;
         }
@@ -215,82 +367,79 @@ Map trimMap(const Map &map) {
 }
 
 //pomocnicza do debugu
-void BprintRow(int* newRow, int i, int size){
+void BprintRow(StateRow newRow, int i){
     cerr<<"\nRow : "<<i<<endl;
     cerr<<"Before moveRow"<<endl;
-    for(int j = 0; j < size; j++){
+    for(int j = 0; j < 8; j++){
         cerr<<newRow[j]<<" ";
     }
     cerr<<endl;
 }
 
 //pomocnicza do debugu
-void AprintRow(int* newRow, int i, int size){
+void AprintRow(StateRow newRow, int i){
     cerr<<"\nAfter moveRow"<<endl;
-    for(int j = 0; j < size; j++){
+    for(int j = 0; j < 8; j++){
         cerr<<newRow[j]<<" ";
     }
     cerr<<endl;
 }
 
 //Funkcja przesuwa mapę w kierunku dirIndex 
-//gdzie active true dla jedynek false dla zer (aktywny gracz)
-Map move(Map &map, int dirIndex, bool active){
-    const auto &dir = directions[dirIndex];
-    Map newMap = map;
+//gdzie active = true oznacza że P1 się rusza a active = false oznacza że P0 się rusza
+State move(const State map, int dirIndex, bool active){
+    State newMap = map;
+    StateRow newRow;
+
     if(dirIndex == UP){//w górę
-        for(int i = 0; i < map[0].size(); i++){
-            int* newRow = new int[map[0].size()];
-            for(int j = 0; j < map.size(); j++){
-                newRow[j] = map[j][i];
+        for(int i = 0; i < width; i++){
+            for(int j = 0; j < height; j++){
+                newRow[j] = map[wrapPosition(j, i)];
             }
             //BprintRow(newRow, i,map.size());
-            newRow = moveRow(map.size(), newRow, active);
+            newRow = moveRow(height, newRow, active);
             //AprintRow(newRow, i,map.size());
-            for(int j = 0; j < map.size(); j++){
-                newMap[j][i] = newRow[j];
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(j, i)] = newRow[j];
             }
         }
     }
     else if(dirIndex == DOWN){//w dół
-        for(int i = 0; i < map[0].size(); i++){
-            int* newRow = new int[map[0].size()];
-            for(int j = map.size() - 1; j >= 0; j--){
-                newRow[map.size() - 1 - j] = map[j][i];
+        for(int i = 0; i < width; i++){
+            for(int j = height - 1; j >= 0; j--){
+                newRow[height - 1 - j] = map[wrapPosition(j, i)];
             }
             //BprintRow(newRow, i,map.size());
-            newRow = moveRow(map.size(), newRow, active);
+            newRow = moveRow(height, newRow, active);
             //AprintRow(newRow, i,map.size());
-            for(int j = 0; j < map.size(); j++){
-                newMap[map.size() - 1 - j][i] = newRow[j];  
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(height - 1 - j, i)] = newRow[j];  
             }
         }
     }
     else if(dirIndex == LEFT){//w lewo
-        for(int i = 0; i < map.size(); i++){
-            int* newRow = new int[map[0].size()];
-            for(int j = 0; j < map[0].size(); j++){
-                newRow[j] = map[i][j];
+        for(int i = 0; i < height; i++){
+            for(int j = 0; j < width; j++){
+                newRow[j] = map[wrapPosition(i, j)];
             }
             //BprintRow(newRow, i,map.size());
-            newRow = moveRow(map[0].size(), newRow, active);
+            newRow = moveRow(width, newRow, active);
             //AprintRow(newRow, i,map.size());
-            for(int j = 0; j < map[0].size(); j++){
-                newMap[i][j] = newRow[j];
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, j)] = newRow[j];
             }
         }
     }
     else if(dirIndex == RIGHT){// w prawo
-        for(int i = 0; i < map.size(); i++){
-            int* newRow = new int[map[0].size()];
-            for(int j = map[0].size() - 1; j >= 0; j--){
-                newRow[map[0].size() - 1 - j] = map[i][j];
+        for(int i = 0; i < height; i++){
+            for(int j = width - 1; j >= 0; j--){
+                newRow[width - 1 - j] = map[wrapPosition(i, j)];
             }
             //BprintRow(newRow, i,map[0].size());
-            newRow = moveRow(map[0].size(), newRow, active);
+            newRow = moveRow(width, newRow, active);
             //AprintRow(newRow, i,map[0].size());
-            for(int j = 0; j < map[0].size(); j++){
-                newMap[i][map[0].size() - 1 - j] = newRow[j];
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, width - 1 - j)] = newRow[j];
             }
         }
     }
@@ -302,251 +451,500 @@ Map move(Map &map, int dirIndex, bool active){
     return newMap;
 }
 
-pair<int, int> getScore(const Map &map, int myID, int opponentID){
-    int myScore = 0;
-    int opponentScore = 0;
-    for(int i = 0; i < map.size(); i++){
-        for(int j = 0; j < map[0].size(); j++){
-            if(map[i][j] == myID){
-                myScore++;
-            }
-            else if(map[i][j] == opponentID){
-                opponentScore++;
-            }
+//Funkcja zwraca wynik gry dla gracza 0 i gracza 1
+pair<int, int> getScore(const State map) {
+    int P0Score = 0;
+    int P1Score = 0;
+    for (int i = 0; i < width * height; ++i) {
+        if (map[i] == 0) {
+            P0Score++;
+        } else if (map[i] == 1) {
+            P1Score++;
         }
     }
-    return {myScore, opponentScore};
+    return {P0Score, P1Score};
 }
 
-bool is_game_over(const Map &map) {
-    bool plONE = false;
-    bool plZERO = false;
-    for (const auto &row : map) {
-        for (int cell : row) {
-            if (cell == PLAYER_ONE) {
-                plONE = true;
-            } else if (cell == PLAYER_ZERO) {
-                plZERO = true;
-            }
-            if(plONE && plZERO){
-                return false;
-            }
+bool is_game_over(const State map) {
+    bool playerOneExists = false;
+    bool playerZeroExists = false;
+
+    for (int i = 0; i < width * height; ++i) {
+        if (map[i] == PLAYER_ONE) {
+            playerOneExists = true;
+        } else if (map[i] == PLAYER_ZERO) {
+            playerZeroExists = true;
+        }
+
+        if (playerOneExists && playerZeroExists) {
+            return false; // Gra trwa
         }
     }
-    return true;
+    return true; // Gra zakończona
 }
 
 //=======================================================================================================
-//MCTS
+//                                                FlatMC
 //=======================================================================================================
 
 // Helper to calculate random direction
 Direction getRandomDirection() {
-    static random_device rd;
-    static mt19937 gen(rd());
-    static uniform_int_distribution<> dis(0, 3);
-    return static_cast<Direction>(dis(gen));
+    return static_cast<Direction>(rand() % 4);
 }
 
-// Perform a single simulation from the given map state
-pair<int, int> simulateGame(Map map, int myID, int opponentID, int maxDepth) {
-    bool active = myID == 1 ? true : false;
+//==================================================================================================
+//                                              MCTS
+//==================================================================================================
+
+//Returns -1 if game is ongoing, 0 if player 0 has won, and 1 if player 1 has won
+int isGameTerminal(const State map) {
+    bool playerOneExists = false;
+    bool playerZeroExists = false;
+
+    for (int i = 0; i < width * height; ++i) {
+        if (map[i] == PLAYER_ONE) {
+            playerOneExists = true;
+        } else if (map[i] == PLAYER_ZERO) {
+            playerZeroExists = true;
+        }
+
+        if (playerOneExists && playerZeroExists) {
+            return -1; // Gra trwa
+        }
+    }
+    if(playerOneExists){
+        return 1;
+    }
+    else{
+        return 0;
+    }
+}
+
+//Funkcja do usuwania z pamięci wszystkich dzieci roota poza safeChild
+void cleanOldBranches(Node root, int safeChild){
+    if (root.isEmpty()) return; // Jeśli węzeł jest nullptr, zakończ
+
+    // Rekurencyjnie zwolnij pamięć dla dzieci
+    for (int i = 0; i < 4; ++i) {
+        if(!Tree[root.children[i]].isEmpty() && root.children[i] != 0 && i!= safeChild){
+            cleanOldBranches(Tree[root.children[i]], -1);
+        }
+    }
+
+    // Zwolnij pamięć dla bieżącego węzła
+    Tree[root.myIdx] = Node();
+    allocatedNodes--;
+}
+
+// //Funkcja do ucinania branchy prowadzących do porażki
+// void pruneTree(Node *root){
+//     for(int i = 0; i < 4; ++i){
+//         if(root->pruned && root->children[i] != 0){
+//             pruneTree(tree[root->children[i]]);
+//             delete tree[root->children[i]];
+//             tree[root->children[i]] = nullptr;
+//             root->children[i] = 0;
+//         }
+//     }
+//     return;
+// }
+
+// //Funkcja do całkowitego czyszczenia drzewa
+// void freeTree(Node* root) {
+//     if (!root) return; // Jeśli węzeł jest nullptr, zakończ
+    
+//     // Rekurencyjnie zwolnij pamięć dla dzieci
+//     for (int i = 0; i < 4; ++i) {
+//         if(root->children[i] != 0){
+//             freeTree(tree[root->children[i]]);
+//         }
+//     }
+
+//     // Zwolnij pamięć dla bieżącego węzła jeżeli jesteś dzieckiem węzła który jest do ucięcia
+//     if(root->pruned && tree[root->parentIdx]->pruned){
+//         tree[root->myIdx] = nullptr;
+//         delete root;
+//     }
+// }
+
+//Naprawia puste miejsca w tree przesuwając wszystko do lewej
+void fixTree(){
+    unsigned int currentIdx = 0;
+    for(int i = 0; i < allocatedNodes; ++i){
+        assert(currentIdx < MAX_NODES);
+        while(!Tree[i].isEmpty()){
+            i++;
+        }
+        while(Tree[currentIdx].isEmpty()){
+            currentIdx++;
+        }
+        //przeniesliśmy się na pierwsze puste miejsce
+        Tree[i] = Tree[currentIdx];
+        Tree[currentIdx] = Node();
+        Tree[i].myIdx = i;
+        if(i == 0){
+            Tree[i].parentIdx = -1;
+        }
+        //poprawiamy w rodzicu indeks tego dziecka które przenieśliśmy
+        if(Tree[i].parentIdx != -1){
+            for(int j = 0; j < 4; ++j){
+                if(Tree[Tree[i].parentIdx].children[j] == currentIdx){
+                    Tree[Tree[i].parentIdx].children[j] = i;
+                }
+            }
+        }
+        //poprawiamy indeksy dzieci
+        for(int j = 0; j < 4; ++j){
+            if(Tree[i].children[j] != 0){//jeżeli dziecko istnieje (bo tylko root ma 0)
+                Tree[Tree[i].children[j]].parentIdx = i;
+            }
+        }
+    }
+}
+
+// Funkcja sprawdzająca limit czasu
+bool check_time(const chrono::steady_clock::time_point& startTime) {
+    auto currentTime = chrono::steady_clock::now();
+    auto elapsedTime = chrono::duration_cast<chrono::milliseconds>(currentTime - startTime).count();
+    return elapsedTime >= TIME_LIMIT;
+}
+
+//Rozgrywa grę od stanu map zaczynając od gracza first_move i zwraca wynik gry (P0, P1)
+pair<int, int> MCTSsim(State map, bool first_move, int maxDepth, const chrono::steady_clock::time_point& startTime) {
+
+    State currMap = map;
+    bool active = first_move;
+    clock_t currentTime;
+
     for (int depth = 0; depth < maxDepth; ++depth) {
-        Direction randomMove = getRandomDirection();
-        map = move(map, randomMove, active);
-        if (is_game_over(map)) {
+        if (is_game_over(currMap)) {
             break;
         }
+
+        Direction randomMove = getRandomDirection();
+        currMap = move(currMap, randomMove, active);
+
+        // Sprawdzenie czasu
+        if (check_time(startTime)) break;
+
+        if (is_game_over(currMap)) {
+            break;
+        }
+
         active = !active;
         randomMove = getRandomDirection();
-        map = move(map, randomMove, active);
-        if (is_game_over(map)) {
+        currMap = move(currMap, randomMove, active);
+
+        // Sprawdzenie czasu
+        if (check_time(startTime)) break;
+
+        if (is_game_over(currMap)) {
             break;
         }
         active = !active;
     }
-    return getScore(map, myID, opponentID);
+
+    return getScore(map);
 }
 
-Direction MCTS(const Map &map, int myID, int opponentID, int depth, int maxDepth, int maxTime){
-    clock_t startTime = clock();
-    vector<int> scores(4, 0); // Scores for each direction
-    vector<int> visits(4, 0); // Number of simulations for each direction
-    Map tempMap = map;
-    int nrOfSimulations = 0;
-    while ((clock() - startTime) * 1000 / CLOCKS_PER_SEC < maxTime) {
-        Direction new_move = getRandomDirection();
-        Map simulatedMap = move(tempMap, new_move, true);
 
-        pair<int, int> score = simulateGame(simulatedMap, myID, opponentID, maxDepth);
-        int myScore = score.first;
-        int opponentScore = score.second;
+pair<Node, State> Selection(Node root, State map){
+    assert(!root.isEmpty());
 
-        int scoreDiff = myScore - opponentScore;
-        scores[new_move] += scoreDiff;
-        visits[new_move]++;
-        nrOfSimulations++;
+    while(root.isFullyExpanded()){
+        root = Tree[root.bestChildIdx(0.7)];
+        move(map, root.move, root.player_nr);
     }
 
-    // Select the direction with the best average score
-    double bestAvg = -1e9;
-    Direction bestMove = UP;
-    for (int i = 0; i < 4; ++i) {
-        if (visits[i] > 0) {
-            double avgScore = static_cast<double>(scores[i]) / visits[i];
-            if (avgScore > bestAvg) {
-                bestAvg = avgScore;
-                bestMove = static_cast<Direction>(i);
+    assert(!root.isFullyExpanded());
+    return {root, map};
+}
+
+Node Expansion(Node current){
+    assert(!current.isFullyExpanded());
+
+    for(int i = 0; i < 4; ++i){
+        if(current.children[i] == 0){
+            assert(allocatedNodes < MAX_NODES);
+            assert(allocatedNodes > 0);
+            assert(Tree[allocatedNodes].isEmpty());
+            Tree[allocatedNodes] = 
+                Node(current.myIdx, static_cast<Direction>(i), current.player_nr ? 0 : 1, allocatedNodes);
+            Node child = Tree[allocatedNodes];
+            assert(!child.isEmpty());
+            assert(!child.isRoot());
+            allocatedNodes++;
+            Tree[current.myIdx].children[i] = child.myIdx;
+            assert(allocatedNodes <= MAX_NODES);
+            return child;
+        }
+    }
+    return Node();
+}
+
+Score Simulation(Node leaf, State map, std::chrono::_V2::steady_clock::time_point startTime){
+    assert(!leaf.isFullyExpanded());
+    assert(!leaf.isEmpty());
+    assert(!leaf.isRoot());
+
+    map = move(map, leaf.move, leaf.player_nr);
+    if(is_game_over(map)){
+        pair<int, int> score = getScore(map);
+        if(score.first > score.second){
+            return {100, -100};
+        }
+        else{
+            return {-100, 100};
+        }
+    }
+
+    assert(!is_game_over(map));
+    pair<int,int> simResult = MCTSsim(map, leaf.player_nr, MAX_DEPTH, startTime);
+    return simResult;
+}
+
+void Backpropagation(Node current, pair<int,int> score, bool myId){
+    assert(!current.isEmpty());
+    assert(!current.isRoot());
+
+    int myScore, opponentScore;
+    if(myId){
+        myScore = score.second;
+        opponentScore = score.first;
+    }
+    else{
+        myScore = score.first;
+        opponentScore = score.second;
+    }
+
+    while(!current.isRoot()){
+        Tree[current.myIdx].visits++;
+        Tree[current.myIdx].score += myScore - opponentScore;
+        current = Tree[current.parentIdx];
+    }
+    // current.visits++;
+    // current.score += myScore - opponentScore;
+}
+
+// Główna funkcja MCTS
+Direction MCTS(State map, int myID, int opponentID, int maxDepth) {
+    // Tworzenie drzewa MCTS
+    assert(allocatedNodes < MAX_NODES);
+    State mapCopy = map;
+    Node Root = Tree[0];
+    //Root.printNode();
+    Node child;
+    // Start czasu
+    auto startTime = chrono::steady_clock::now();
+    //root->printNode();
+    cerr << "MCTS\n";
+    int i = 0;
+    // Główna pętla MCTS
+    while(true && i < 6500){
+        Node current = Root;
+        State currentMapCopy = mapCopy;
+
+        //1. Selection
+        pair<Node, State> selectionResult = Selection(current, mapCopy);
+        current = selectionResult.first;
+        currentMapCopy = selectionResult.second;
+        // Sprawdzenie czasu
+        if (check_time(startTime)) break;
+
+        //2. Expansion
+        child = Expansion(current);
+        assert(!child.isEmpty());
+        current = child;
+        // Sprawdzenie czasu
+        if (check_time(startTime)) break;
+
+        //3. Simulation
+        Score simulationResult = Simulation(current, currentMapCopy, startTime);
+        // Sprawdzenie czasu
+        if (check_time(startTime)) break;
+
+        //4. Backpropagation
+        Backpropagation(current, simulationResult, myID == 1);
+        // Sprawdzenie czasu
+        if (check_time(startTime)) break;
+    }
+    int bestChildIdx = Root.bestChildIdx(0);
+    Node bestChild = Tree[Root.children[bestChildIdx]];
+    assert(!bestChild.isEmpty());
+    cleanOldBranches(Root, bestChildIdx);
+    fixTree();
+
+    if(DEBUG){//Print 6 first nodes of the tree
+        for(int i = 0; i < 6; i++){
+            cerr << "Node " << i << endl;
+            Tree[i].printNode();
+        }
+
+    }
+    lastmap = move(map, bestChild.move, myID);
+    return bestChild.move;
+}
+
+void Reparenting(State gamemap, bool my_id){
+    cerr << "Starting Reparenting\n";
+    assert(Tree[0].player_nr == my_id);
+    assert(lastmove != -1);
+    assert(!Tree[0].isEmpty());
+    assert(Tree[0].isRoot());
+    for(int i = 0; i < 4; i++){
+        State lastMapCopy = lastmap;
+        lastMapCopy = move(lastMapCopy, i, my_id == 0 ? 1 : 0);
+        assert(lastMapCopy != lastmap);
+        bool theSame = true;
+        for(int j = 0; j < 64; ++j){
+            if(gamemap[j] != lastMapCopy[j]){
+                theSame = false;
+                break;
+            }
+        }
+        if(theSame){
+            for(int j = 0; j < 4; j++){
+                if(Tree[0].children[j] != 0 && Tree[Tree[0].children[j]].move == i){
+                    cleanOldBranches(Tree[0], j);
+                    fixTree();
+                    assert(Tree[0].isRoot());
+                    assert(Tree[0].player_nr != my_id);
+                    return;
+                }
             }
         }
     }
-    cerr << "Number of simulations: " << nrOfSimulations << endl;
-    return bestMove;
 }
 
-int main() {
-    //Zakomentowany kod do interakcji z API gry
-    int my_id; // Your id, 0 or 1
-    cin >> my_id; cin.ignore();
-    int height; // height of the grid
-    cin >> height; cin.ignore();
-    int width; // width of the grid
-    cin >> width; cin.ignore();
+bool hardcode = false;
 
-    //vector<int> game_map(width * height, -1); // Mapa gry
-    Map gameMap = vector<vector<int>>(height, vector<int>(width, -1));
+int main() {//ios_base.sync(0)
+    initializeTree();
+    int my_id; // Your id, 0 or 1
+    if(!hardcode){
+        cin >> my_id;
+        cin >> height;
+        cin >> width;
+    }
+    else{
+        my_id = 0;
+        height = 8;
+        width = 8;
+    }
+
+    Tree[0] = Node(-1, UP, !my_id, 0);
+    allocatedNodes = 1;
+
+    State gamemap;
+    for(int i = 0; i < width * height; ++i){
+        gamemap[i] = EMPTY;
+    }
     // game loop
     while (1) {
-        for (int i = 0; i < height; i++) {
-            string line;
-            getline(cin, line); // string describing tiles of a line of the grid containing values: 0 or 1: player with this id, '-': empty, 'x': hole
-           // cerr<<line<<endl;
-            for (int j = 0; j < line.size(); j++) {
-                if (line[j] == '-'){
+        //array input
+        if(!hardcode){
+            for (int i = 0; i < height * width; i++) {
+                char letter;
+                cin>>letter; // string describing tiles of a line of the grid containing values: 0 or 1: player with this id, '-': empty, 'x': hole
+            
+                if(letter == ' '){
+                    cin>>letter;
+                }
+                if (letter == '-'){
                     //cerr<<"EMPTY"<<endl;
-                    gameMap[i][j/2] = EMPTY;
+                    gamemap[i] = EMPTY;
                 }
-                else if (line[j] == '0'){
+                else if (letter == '0'){
                     //cerr<<"PLAYER_ZERO"<<endl;
-                    gameMap[i][j/2] = PLAYER_ZERO;
+                    gamemap[i] = PLAYER_ZERO;
                 }
-                else if (line[j] == '1'){
+                else if (letter == '1'){
                     //cerr<<"PLAYER_ONE"<<endl;
-                    gameMap[i][j/2] = PLAYER_ONE;
+                    gamemap[i] = PLAYER_ONE;
                 }
-                else if (line[j] == 'x'){
+                else if (letter == 'x'){
                     //cerr<<"HOLE"<<endl;
-                    gameMap[i][j/2] = HOLE;
+                    gamemap[i] = HOLE;
                 }
             }
         }
-        //printMap(gameMap);
+        else{
+            gamemap = {0, 0, 0, 0, 1, 1, 1, 0, 
+                        0, 1, 0, 1, 1, 0, 1, 1, 
+                        0, 0, 0, 0, 0, 0, 1, 0, 
+                        1, 1, 1, 1, 1, 0, 0, 1, 
+                        0, 1, 1, 1, 0, 1, 0, 1, 
+                        0, 0, 1, 1, 0, 0, 1, 1, 
+                        1, 0, 1, 1, 0, 1, 1, 0, 
+                        0, 1, 0, 0, 1, 0, 1, 0};
+        }
+        if(DEBUG){// print cały input
+            cerr << "my_id: " << my_id << endl;
+            cerr << "height: " << height << endl;
+            cerr << "width: " << width << endl;
+            cerr << "gamemap: " << endl;
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    //print cin input of game map
+                    if(gamemap[i * width + j] == EMPTY){
+                        cerr << "- ";
+                    }
+                    else if(gamemap[i * width + j] == PLAYER_ZERO){
+                        cerr << "0 ";
+                    }
+                    else if(gamemap[i * width + j] == PLAYER_ONE){
+                        cerr << "1 ";
+                    }
+                    else if(gamemap[i * width + j] == HOLE){
+                        cerr << "x ";
+                    }
+                }
+                cerr << endl;
+            }      
+        }
 
-        Direction move = MCTS(gameMap, my_id, my_id == 0 ? 1 : 0, 0, MAX_DEPTH, TIME_LIMIT);
+        // cerr<<"about to clean tree[0]->player_nr : "<<tree[0]->player_nr<<endl;
+        
+        cerr << "Allocated nodes BEFORE REPARENTING: " << allocatedNodes << endl;
+        cerr << "Root player_nr BEFORE REPARENTING: " << Tree[0].player_nr << endl;
+        //Sprawdź jaki ruch zrobił przeciwnik i odetnij niepotrzebne Nody (powien zmienić player_nr roota)
+        if(lastmove != -1){
+            cerr << "Reparenting\n";
+            Reparenting(gamemap, my_id);
+        }
+        cerr<<"Root player_nr: "<<Tree[0].player_nr<<endl;
+        cerr << "Allocated nodes BEFORE: " << allocatedNodes << endl;
+        bool lastPLR = Tree[0].player_nr;
+        Direction move = MCTS(gamemap, my_id, my_id == 0 ? 1 : 0, MAX_DEPTH);//wchodząc do MCTS root powinien być wroga
+        assert(lastPLR != Tree[0].player_nr);
+        cerr << "Allocated nodes AFTER: " << allocatedNodes << endl;
+        cerr<<"Root player_nr: "<<Tree[0].player_nr<<endl;
         switch (move)
         {
         case UP:
             cout << "UP" << endl;
+            lastmove = 0;
             break;
         
         case DOWN:
             cout << "DOWN" << endl;
+            lastmove = 1;
             break;
 
         case LEFT:
             cout << "LEFT" << endl;
+            lastmove = 2;
             break;
 
         case RIGHT:
             cout << "RIGHT" << endl;
+            lastmove = 3;
             break;
 
         default:
             cout << "UP" << endl;
+            lastmove = 0;
             break;
         }
-        /* DEBUG
-        // Example map
-        Map map = {
-            {1, 1, 1, 1, 0, 1, 1, 0},
-            {1, 0, 0, 0, 0, 0, 0, 0},
-            {1, 1, 1, 0, 1, 0, 0, 1},
-            {1, 0, 1, 0, 0, 1, 0, 1},
-            {1, 0, 1, 1, 1, 0, 0, 1},
-            {0, 0, 1, 1, 1, 1, 0, 1},
-            {0, 0, 0, 0, 0, 1, 0, 0},
-            {1, 1, 1, 1, 1, 1, 1, 1}
-        };
-        Map tempMap = map;
-        cerr << "Initial map:" << endl;
-        printMap(map);
-
-        // Player 0 moves up
-        //map = move(map, UP, PLAYER_ZERO);
-        // //cerr << "Before Player 0 moves up:" << endl;
-        // //printMap(tempMap);
-        // cerr << "After Player 0 moves up:" << endl;
-        // printMap(map);
-        
-        // // Player 1 moves down
-        // tempMap = map;
-        // map = move(map, DOWN, PLAYER_ONE);
-        // //printMap(tempMap);
-        // cerr << "After Player 1 moves down:" << endl;
-        // //printMap(map);
-        
-        //cerr << "After Player 0 moves left:" << endl;
-        
-        // // Player 0 moves right
-        // map = move(map, RIGHT, PLAYER_ZERO);
-        // cerr << "After Player 0 moves right:" << endl;
-        // printMap(map);
-        
-        // // Player 1 moves right
-        // map = move(map, RIGHT, PLAYER_ONE);
-        // cerr << "After Player 1 moves right:" << endl;
-        // printMap(map);
-
-        //make 6 random moves
-        for(int i = 0; i < 40; i++){
-            bool isEmpty = true;
-            //check is map empty
-            for(int j = 0; j < map.size(); j++){
-                for(int k = 0; k < map[0].size(); k++){
-                    if(map[j][k] != HOLE){
-                        isEmpty = false;
-                        break;
-                    }
-                }
-                if(!isEmpty){
-                    break;
-                }
-            }
-            if(isEmpty){
-                cerr<<"Map is empty"<<endl;
-                break;
-            }
-            int random = rand() % 4;
-            map = move(map, random, i % 2);
-            cerr << "After player "<<i % 2<<" moves ";
-            if(Direction(random) == UP){
-                cerr<<"UP"<<endl;
-            }
-            else if(Direction(random) == DOWN){
-                cerr<<"DOWN"<<endl;
-            }
-            else if(Direction(random) == LEFT){
-                cerr<<"LEFT"<<endl;
-            }
-            else if(Direction(random) == RIGHT){
-                cerr<<"RIGHT"<<endl;
-            }
-            printMap(map);
-        }*/
     }
 }
-
-
-/**
- * Try to survive by not falling off
- **/

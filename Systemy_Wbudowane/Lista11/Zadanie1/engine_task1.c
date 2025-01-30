@@ -6,7 +6,7 @@
 
 void ADC_init() {
     // Konfiguracja ADC
-    ADMUX = (1 << REFS0); // Napięcie odniesienia na AVcc, ADC0
+    ADMUX = (1 << REFS0) | 1; // Napięcie odniesienia na AVcc, ADC0
     ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1); // Włącz ADC, preskaler 64
 }
 
