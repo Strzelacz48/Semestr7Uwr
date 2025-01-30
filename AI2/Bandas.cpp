@@ -1,5 +1,7 @@
 #pragma GCC optimize("Ofast,inline,tracer")
 #pragma GCC optimize("unroll-loops,vpt,split-loops,unswitch-loops")
+#pragma GCC optimize("Ofast,inline,tracer")
+#pragma GCC optimize("unroll-loops,vpt,split-loops,unswitch-loops")
 #include <iostream>
 #include <string>
 #include <vector>
@@ -283,9 +285,12 @@ State trimMap(const State map) {
         int row_state = HOLE;
         for(int j = 0; j < width; j++){
             if(map[wrapPosition(i, j)] != EMPTY && map[wrapPosition(i, j)] != HOLE){
+        for(int j = 0; j < width; j++){
+            if(map[wrapPosition(i, j)] != EMPTY && map[wrapPosition(i, j)] != HOLE){
                 row_state = OCCUPIED;
                 break;
             }
+            else if(map[wrapPosition(i, j)] == EMPTY){
             else if(map[wrapPosition(i, j)] == EMPTY){
                 row_state = EMPTY;
             }
@@ -294,6 +299,8 @@ State trimMap(const State map) {
             break;
         }
         else if(row_state == EMPTY){
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, j)] = HOLE;
             for(int j = 0; j < width; j++){
                 newMap[wrapPosition(i, j)] = HOLE;
             }
@@ -301,12 +308,16 @@ State trimMap(const State map) {
         }
     }
     for(int i = height - 1; i >= 0; i--){// cięcie od dołu
+    for(int i = height - 1; i >= 0; i--){// cięcie od dołu
         int row_state = HOLE;
+        for(int j = 0; j < width; j++){
+            if(map[wrapPosition(i, j)] != EMPTY && map[wrapPosition(i, j)] != HOLE){
         for(int j = 0; j < width; j++){
             if(map[wrapPosition(i, j)] != EMPTY && map[wrapPosition(i, j)] != HOLE){
                 row_state = OCCUPIED;
                 break;
             }
+            else if(map[wrapPosition(i, j)] == EMPTY){
             else if(map[wrapPosition(i, j)] == EMPTY){
                 row_state = EMPTY;
             }
@@ -317,17 +328,23 @@ State trimMap(const State map) {
         else if(row_state == EMPTY){
             for(int j = 0; j < width; j++){
                 newMap[wrapPosition(i, j)] = HOLE;
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, j)] = HOLE;
             }
             //break;
         }
     }
     for(int i = 0; i < width - 1; i++){// cięcie od lewej
+    for(int i = 0; i < width - 1; i++){// cięcie od lewej
         int col_state = HOLE;
+        for(int j = 0; j < height; j++){
+            if(map[wrapPosition(j, i)] != EMPTY && map[wrapPosition(j, i)] != HOLE){
         for(int j = 0; j < height; j++){
             if(map[wrapPosition(j, i)] != EMPTY && map[wrapPosition(j, i)] != HOLE){
                 col_state = OCCUPIED;
                 break;
             }
+            else if(map[wrapPosition(j, i)] == EMPTY){
             else if(map[wrapPosition(j, i)] == EMPTY){
                 col_state = EMPTY;
             }
@@ -338,17 +355,23 @@ State trimMap(const State map) {
         else if(col_state == EMPTY){
             for(int j = 0; j < height; j++){
                 newMap[wrapPosition(j, i)] = HOLE;
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(j, i)] = HOLE;
             }
             //break;
         }
     }
     for(int i = width - 1; i >= 0; i--){// cięcie od prawej
+    for(int i = width - 1; i >= 0; i--){// cięcie od prawej
         int col_state = HOLE;
+        for(int j = 0; j < height; j++){
+            if(map[wrapPosition(j, i)] != EMPTY && map[wrapPosition(j, i)] != HOLE){
         for(int j = 0; j < height; j++){
             if(map[wrapPosition(j, i)] != EMPTY && map[wrapPosition(j, i)] != HOLE){
                 col_state = OCCUPIED;
                 break;
             }
+            else if(map[wrapPosition(j, i)] == EMPTY){
             else if(map[wrapPosition(j, i)] == EMPTY){
                 col_state = EMPTY;
             }
@@ -357,6 +380,8 @@ State trimMap(const State map) {
             break;
         }
         else if(col_state == EMPTY){
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(j, i)] = HOLE;
             for(int j = 0; j < height; j++){
                 newMap[wrapPosition(j, i)] = HOLE;
             }
@@ -398,7 +423,10 @@ State move(const State map, int dirIndex, bool active){
             }
             //BprintRow(newRow, i,map.size());
             newRow = moveRow(height, newRow, active);
+            newRow = moveRow(height, newRow, active);
             //AprintRow(newRow, i,map.size());
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(j, i)] = newRow[j];
             for(int j = 0; j < height; j++){
                 newMap[wrapPosition(j, i)] = newRow[j];
             }
@@ -411,7 +439,10 @@ State move(const State map, int dirIndex, bool active){
             }
             //BprintRow(newRow, i,map.size());
             newRow = moveRow(height, newRow, active);
+            newRow = moveRow(height, newRow, active);
             //AprintRow(newRow, i,map.size());
+            for(int j = 0; j < height; j++){
+                newMap[wrapPosition(height - 1 - j, i)] = newRow[j];  
             for(int j = 0; j < height; j++){
                 newMap[wrapPosition(height - 1 - j, i)] = newRow[j];  
             }
@@ -424,7 +455,10 @@ State move(const State map, int dirIndex, bool active){
             }
             //BprintRow(newRow, i,map.size());
             newRow = moveRow(width, newRow, active);
+            newRow = moveRow(width, newRow, active);
             //AprintRow(newRow, i,map.size());
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, j)] = newRow[j];
             for(int j = 0; j < width; j++){
                 newMap[wrapPosition(i, j)] = newRow[j];
             }
@@ -437,7 +471,10 @@ State move(const State map, int dirIndex, bool active){
             }
             //BprintRow(newRow, i,map[0].size());
             newRow = moveRow(width, newRow, active);
+            newRow = moveRow(width, newRow, active);
             //AprintRow(newRow, i,map[0].size());
+            for(int j = 0; j < width; j++){
+                newMap[wrapPosition(i, width - 1 - j)] = newRow[j];
             for(int j = 0; j < width; j++){
                 newMap[wrapPosition(i, width - 1 - j)] = newRow[j];
             }
@@ -481,9 +518,11 @@ bool is_game_over(const State map) {
         }
     }
     return true; // Gra zakończona
+    return true; // Gra zakończona
 }
 
 //=======================================================================================================
+//                                                FlatMC
 //                                                FlatMC
 //=======================================================================================================
 
@@ -630,6 +669,7 @@ pair<int, int> MCTSsim(State map, bool first_move, int maxDepth, const chrono::s
         if (is_game_over(currMap)) {
             break;
         }
+
 
         active = !active;
         randomMove = getRandomDirection();
@@ -946,5 +986,7 @@ int main() {//ios_base.sync(0)
             lastmove = 0;
             break;
         }
+    }
+}
     }
 }
